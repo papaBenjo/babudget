@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>B & A · Budget</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream:#f5f0e8; --cream2:#ede6d6; --cream3:#ddd0b8;
+  --forest:#1e3528; --forest2:#2a4a38;
+  --gold:#c8a84b; --gold2:#e2c46a;
+  --terra:#b85c3a; --sage:#6b9470;
+  --text:#1e2a20; --muted:#7a7060;
+  --radius:18px; --radius-sm:12px;
+  --shadow:0 4px 24px rgba(30,53,40,0.11);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--cream);color:var(--text);font-family:'Lato',sans-serif;}
+
+.app{display:flex;flex-direction:column;height:100vh;max-width:430px;margin:0 auto;background:var(--cream);position:relative;overflow:hidden;}
+.app::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.028;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:180px;}
+
+.page{flex:1;overflow-y:auto;padding-bottom:90px;display:none;-webkit-overflow-scrolling:touch;}
+.page.active{display:block;animation:fadeUp 0.26s ease both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* NAV */
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;
+  background:var(--forest);display:flex;z-index:100;padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -1px 0 rgba(255,255,255,0.05);}
+nav button{flex:1;padding:13px 0 10px;background:none;border:none;color:rgba(255,255,255,0.35);
+  font-family:'Lato',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.08em;
+  text-transform:uppercase;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:color 0.2s;}
+nav button.active{color:var(--gold2);}
+nav button svg{width:20px;height:20px;}
+.nav-add{position:relative;top:-8px;}
+.nav-add svg{background:var(--gold);border-radius:50%;padding:7px;width:44px!important;height:44px!important;color:var(--forest)!important;box-shadow:0 4px 16px rgba(200,168,75,0.4);}
+
+/* HEADER */
+.page-header{padding:54px 22px 10px;}
+.eyebrow{font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;}
+.page-header h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:400;line-height:1.2;color:var(--forest);}
+.page-header p{color:var(--muted);font-size:13px;margin-top:5px;font-weight:300;}
+.divider{height:1px;background:linear-gradient(90deg,var(--gold),transparent 75%);margin:14px 22px;opacity:0.45;}
+
+/* MONTH ROW */
+.month-row{display:flex;align-items:center;padding:0 22px 18px;gap:14px;}
+.month-row button{width:34px;height:34px;background:var(--cream2);border:1px solid var(--cream3);border-radius:50%;color:var(--forest);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;}
+.month-row button:active{background:var(--cream3);}
+.month-row span{font-family:'Playfair Display',serif;font-size:17px;color:var(--forest);flex:1;}
+
+/* SYNC BAR */
+.sync-bar{display:flex;align-items:center;gap:6px;padding:0 22px 14px;font-size:11px;color:var(--muted);font-weight:300;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--sage);flex-shrink:0;transition:background 0.3s;}
+.sync-dot.syncing{background:var(--gold);animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--terra);}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* HOUSE CARD */
+.house-card{margin:0 22px 14px;background:var(--forest);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;box-shadow:0 8px 32px rgba(30,53,40,0.22);}
+.house-card::before{content:'🏡';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:52px;opacity:0.13;}
+.house-card::after{content:'';position:absolute;bottom:0;right:0;width:160px;height:160px;background:radial-gradient(circle at bottom right,rgba(200,168,75,0.18),transparent 70%);}
+.h-eyebrow{font-size:10px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:rgba(245,240,232,0.4);margin-bottom:4px;}
+.h-amount{font-family:'Playfair Display',serif;font-size:34px;color:var(--gold2);line-height:1;}
+.h-sub{font-size:12px;color:rgba(245,240,232,0.4);margin-top:4px;font-weight:300;}
+.h-bar-wrap{margin-top:14px;}
+.h-bar-labels{display:flex;justify-content:space-between;font-size:11px;color:rgba(245,240,232,0.35);margin-bottom:6px;font-weight:300;}
+.h-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:999px;overflow:hidden;}
+.h-bar-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:999px;transition:width 1s cubic-bezier(.4,0,.2,1);}
+.h-milestones{display:flex;gap:8px;margin-top:12px;}
+.ms{flex:1;background:rgba(255,255,255,0.05);border-radius:8px;padding:7px 8px;text-align:center;border:1px solid rgba(200,168,75,0.12);}
+.ms.reached{background:rgba(200,168,75,0.1);border-color:rgba(200,168,75,0.28);}
+.ms-pct{font-family:'Playfair Display',serif;font-size:14px;color:rgba(245,240,232,0.5);}
+.ms.reached .ms-pct{color:var(--gold2);}
+.ms-lbl{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(245,240,232,0.3);margin-top:2px;}
+.ms.reached .ms-lbl{color:var(--gold);}
+
+/* SUMMARY CARDS */
+.summary-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 22px 22px;}
+.card{background:#fff;border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);border:1px solid rgba(200,168,75,0.1);position:relative;overflow:hidden;}
+.card::after{content:'';position:absolute;bottom:0;right:0;width:70px;height:70px;background:radial-gradient(circle at bottom right,rgba(200,168,75,0.07),transparent 70%);}
+.hero-card{grid-column:1/-1;background:var(--forest);color:var(--cream);padding:20px;}
+.hero-card::after{width:130px;height:130px;background:radial-gradient(circle at bottom right,rgba(200,168,75,0.14),transparent 70%);}
+.card-lbl{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.hero-card .card-lbl{color:rgba(245,240,232,0.4);}
+.card-val{font-family:'Playfair Display',serif;font-size:26px;color:var(--forest);line-height:1;}
+.hero-card .card-val{color:var(--gold2);font-size:36px;}
+.card-sub{font-size:12px;color:var(--muted);margin-top:4px;font-weight:300;}
+.hero-card .card-sub{color:rgba(245,240,232,0.45);}
+.hero-bar{margin-top:14px;height:4px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden;}
+.hero-bar-fill{height:100%;background:var(--gold);border-radius:999px;transition:width 0.8s cubic-bezier(.4,0,.2,1);}
+.border-b{border-top:3px solid var(--forest2);}
+.border-a{border-top:3px solid var(--gold);}
+.monogram{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:13px;}
+.mono-b{background:var(--forest);color:var(--cream);}
+.mono-a{background:var(--gold);color:var(--forest);}
+
+/* SEC TITLE */
+.sec-title{display:flex;align-items:center;gap:10px;padding:4px 22px 12px;}
+.sec-title span{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--cream3);}
+
+/* CAT BARS */
+.categories{padding:0 22px 22px;display:flex;flex-direction:column;gap:8px;}
+.cat-row{background:#fff;border-radius:var(--radius-sm);padding:13px 15px;box-shadow:0 2px 12px rgba(30,53,40,0.06);border:1px solid rgba(200,168,75,0.08);}
+.cat-row-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.cat-name{font-size:13px;font-weight:700;color:var(--forest);display:flex;align-items:center;gap:9px;}
+.cat-ico{width:28px;height:28px;background:var(--cream2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.cat-amts{font-size:12px;color:var(--muted);font-weight:300;}
+.cat-bar{height:4px;background:var(--cream2);border-radius:999px;overflow:hidden;}
+.cat-bar-fill{height:100%;border-radius:999px;transition:width 0.7s cubic-bezier(.4,0,.2,1);}
+.bar-good{background:var(--sage);}.bar-warn{background:var(--gold);}.bar-danger{background:var(--terra);}
+
+/* TRANSACTIONS */
+.transactions{padding:0 22px 22px;display:flex;flex-direction:column;gap:8px;}
+.txn{background:#fff;border-radius:var(--radius-sm);padding:12px 14px;border:1px solid rgba(200,168,75,0.08);display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(30,53,40,0.06);cursor:pointer;transition:transform 0.12s,box-shadow 0.12s;}
+.txn:active{transform:scale(0.985);box-shadow:none;}
+.txn-ico{width:40px;height:40px;border-radius:11px;background:var(--cream2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.txn-info{flex:1;min-width:0;}
+.txn-title{font-size:14px;font-weight:700;color:var(--forest);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.txn-meta{font-size:11px;color:var(--muted);margin-top:2px;font-weight:300;display:flex;align-items:center;gap:6px;}
+.txn-amount{font-family:'Playfair Display',serif;font-size:16px;color:var(--forest);flex-shrink:0;}
+.who-pill{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:2px 7px;border-radius:999px;}
+.who-b{background:var(--forest);color:var(--cream2);}
+.who-a{background:var(--gold);color:var(--forest);}
+.empty-state{text-align:center;padding:52px 20px;color:var(--muted);}
+.empty-state .big{font-size:40px;margin-bottom:14px;}
+.empty-state p{font-size:14px;font-weight:300;line-height:1.7;}
+.empty-state em{font-family:'Playfair Display',serif;font-style:italic;color:var(--gold);}
+
+/* FORM */
+.form-body{padding:0 22px 20px;display:flex;flex-direction:column;gap:18px;}
+.field label{display:block;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.field input,.field select,.field textarea{width:100%;background:#fff;border:1.5px solid var(--cream3);border-radius:var(--radius-sm);padding:13px 15px;color:var(--text);font-family:'Lato',sans-serif;font-size:15px;outline:none;transition:border-color 0.2s,box-shadow 0.2s;box-shadow:0 2px 8px rgba(30,53,40,0.05);-webkit-appearance:none;appearance:none;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,75,0.13);}
+.field textarea{resize:none;height:80px;}
+.amount-wrap{position:relative;}
+.amount-pre{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-family:'Playfair Display',serif;font-size:22px;color:var(--muted);pointer-events:none;}
+.amount-input{font-family:'Playfair Display',serif!important;font-size:28px!important;padding-left:34px!important;color:var(--forest)!important;}
+.who-toggle{display:flex;gap:10px;}
+.who-toggle button{flex:1;padding:13px;background:#fff;border:2px solid var(--cream3);border-radius:var(--radius-sm);color:var(--muted);font-family:'Lato',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.18s;box-shadow:0 2px 8px rgba(30,53,40,0.05);}
+.act-b{border-color:var(--forest)!important;color:var(--forest)!important;background:rgba(30,53,40,0.05)!important;}
+.act-a{border-color:var(--gold)!important;color:#7a5c00!important;background:rgba(200,168,75,0.07)!important;}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.cat-btn{padding:11px 6px 9px;background:#fff;border:2px solid var(--cream3);border-radius:var(--radius-sm);color:var(--muted);font-family:'Lato',sans-serif;font-size:11px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.18s;box-shadow:0 2px 8px rgba(30,53,40,0.04);}
+.cat-btn span{display:block;font-size:20px;margin-bottom:5px;}
+.cat-btn.selected{border-color:var(--forest);color:var(--forest);background:rgba(30,53,40,0.05);}
+.submit-btn{width:100%;padding:17px;background:var(--forest);color:var(--cream);border:none;border-radius:var(--radius);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 20px rgba(30,53,40,0.22);transition:opacity 0.15s,transform 0.1s;margin-top:4px;}
+.submit-btn:active{opacity:0.88;transform:scale(0.99);}
+
+/* HISTORY FILTERS */
+.filter-row{display:flex;gap:8px;padding:0 22px 16px;overflow-x:auto;scrollbar-width:none;}
+.filter-row::-webkit-scrollbar{display:none;}
+.filter-chip{padding:7px 15px;background:#fff;border:1.5px solid var(--cream3);border-radius:999px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.18s;box-shadow:0 2px 8px rgba(30,53,40,0.05);}
+.filter-chip.active{background:var(--forest);color:var(--cream);border-color:var(--forest);}
+
+/* SETTINGS */
+.settings-section{padding:0 22px 20px;display:flex;flex-direction:column;gap:8px;}
+.settings-row{background:#fff;border-radius:var(--radius-sm);padding:13px 15px;border:1px solid rgba(200,168,75,0.1);display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(30,53,40,0.05);}
+.settings-row label{flex:1;font-size:14px;font-weight:700;color:var(--forest);}
+.s-ico{width:30px;height:30px;background:var(--cream2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.settings-row input[type=number]{width:100px;background:var(--cream2);border:1.5px solid var(--cream3);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Playfair Display',serif;font-size:14px;text-align:right;outline:none;}
+.settings-row input[type=number]:focus{border-color:var(--gold);}
+.name-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 22px 20px;}
+.save-btn{display:block;width:calc(100% - 44px);margin:4px 22px 0;padding:16px;background:var(--forest);color:var(--cream);border:none;border-radius:var(--radius);font-family:'Lato',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 20px rgba(30,53,40,0.2);}
+.house-settings-card{margin:0 22px 20px;background:#fff;border-radius:var(--radius);padding:18px;border:1px solid rgba(200,168,75,0.1);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px;}
+.house-settings-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.house-settings-row span{font-size:14px;font-weight:700;color:var(--forest);}
+.house-settings-row input{width:120px;background:var(--cream2);border:1.5px solid var(--cream3);border-radius:8px;padding:9px 12px;font-family:'Playfair Display',serif;font-size:15px;text-align:right;outline:none;color:var(--text);}
+.house-settings-row input:focus{border-color:var(--gold);}
+.settings-hint{font-size:11px;color:var(--muted);font-weight:300;line-height:1.5;}
+
+/* TOAST */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-90px);background:var(--forest);color:var(--cream);padding:12px 26px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:0.05em;z-index:999;transition:transform 0.3s cubic-bezier(.4,0,.2,1);white-space:nowrap;border:1px solid rgba(200,168,75,0.25);box-shadow:0 8px 24px rgba(30,53,40,0.28);}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* LOADING */
+.loading-overlay{position:fixed;inset:0;background:var(--cream);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity 0.5s;}
+.loading-overlay.hidden{opacity:0;pointer-events:none;}
+.loading-logo{font-family:'Playfair Display',serif;font-size:36px;color:var(--forest);margin-bottom:6px;}
+.loading-sub{font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--gold);}
+.loading-dots{margin-top:28px;display:flex;gap:7px;}
+.loading-dots span{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:dot 1.2s infinite;}
+.loading-dots span:nth-child(2){animation-delay:0.2s;}
+.loading-dots span:nth-child(3){animation-delay:0.4s;}
+@keyframes dot{0%,80%,100%{opacity:0.15;transform:scale(0.75)}40%{opacity:1;transform:scale(1)}}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="loading-logo">B &amp; A</div>
+  <div class="loading-sub">Family Budget</div>
+  <div class="loading-dots"><span></span><span></span><span></span></div>
+</div>
+
+<div class="app">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div class="eyebrow">B &amp; A · Family</div>
+      <h1 id="dash-greet">Good morning</h1>
+      <p id="dash-sub">Here's how you're doing this month</p>
+    </div>
+    <div class="divider"></div>
+    <div class="sync-bar">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-label">Connecting…</span>
+    </div>
+    <div id="house-card-wrap"></div>
+    <div class="month-row">
+      <button onclick="changeMonth(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <span id="month-lbl"></span>
+      <button onclick="changeMonth(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></button>
+    </div>
+    <div class="summary-cards" id="summary-cards"></div>
+    <div class="sec-title"><span>By Category</span></div>
+    <div class="categories" id="cat-bars"></div>
+    <div class="sec-title"><span>Recent</span></div>
+    <div class="transactions" id="recent-txns"></div>
+  </div>
+
+  <!-- ADD -->
+  <div class="page" id="page-add">
+    <div class="page-header">
+      <div class="eyebrow">New Entry</div>
+      <h1>Add Expense</h1>
+      <p>Log what you spent</p>
+    </div>
+    <div class="divider"></div>
+    <div class="form-body">
+      <div class="field">
+        <label>Amount</label>
+        <div class="amount-wrap">
+          <span class="amount-pre">$</span>
+          <input type="number" id="f-amount" class="amount-input" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+        </div>
+      </div>
+      <div class="field">
+        <label>Where / What</label>
+        <input type="text" id="f-merchant" placeholder="e.g. Whole Foods, Netflix…">
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <div class="cat-grid" id="cat-grid"></div>
+      </div>
+      <div class="field">
+        <label>Who spent it?</label>
+        <div class="who-toggle">
+          <button id="who-b" onclick="selectWho('b')">Benjamin</button>
+          <button id="who-a" onclick="selectWho('a')">Adrian</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f-date">
+      </div>
+      <div class="field">
+        <label>Notes <span style="font-weight:300;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <textarea id="f-notes" placeholder="Any extra details…"></textarea>
+      </div>
+      <button class="submit-btn" onclick="submitExpense()">Save Expense</button>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="page" id="page-history">
+    <div class="page-header">
+      <div class="eyebrow">Ledger</div>
+      <h1>All Transactions</h1>
+      <p>Tap any entry to delete it</p>
+    </div>
+    <div class="divider"></div>
+    <div class="filter-row" id="filter-row"></div>
+    <div class="transactions" id="all-txns"></div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="page" id="page-settings">
+    <div class="page-header">
+      <div class="eyebrow">Preferences</div>
+      <h1>Settings</h1>
+      <p>Budgets, names &amp; house goal</p>
+    </div>
+    <div class="divider"></div>
+    <div class="sec-title"><span>Your Names</span></div>
+    <div class="name-fields">
+      <div class="field"><label>Person 1</label><input type="text" id="s-name-b" placeholder="Benjamin"></div>
+      <div class="field"><label>Person 2</label><input type="text" id="s-name-a" placeholder="Adrian"></div>
+    </div>
+    <div class="sec-title"><span>🏡 House Goal</span></div>
+    <div class="house-settings-card">
+      <div class="house-settings-row">
+        <span>Down payment target</span>
+        <input type="number" id="s-house-goal" value="55000" min="0" step="1000">
+      </div>
+      <div class="house-settings-row">
+        <span>Already saved</span>
+        <input type="number" id="s-house-saved" value="0" min="0" step="100">
+      </div>
+      <div class="settings-hint">Logging a "💰 House Fund" expense each month automatically adds to your progress tracker above.</div>
+    </div>
+    <div class="sec-title"><span>Monthly Budget Limits</span></div>
+    <div class="settings-section" id="budget-settings"></div>
+    <br>
+    <button class="save-btn" onclick="saveSettings()">Save &amp; Sync Settings</button>
+    <br><br>
+  </div>
+
+  <!-- NAV -->
+  <nav>
+    <button class="active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      Home
+    </button>
+    <button class="nav-add" onclick="showPage('add',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="12"/><path d="M12 7v10M7 12h10" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+      Add
+    </button>
+    <button onclick="showPage('history',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      Ledger
+    </button>
+    <button onclick="showPage('settings',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      Settings
+    </button>
+  </nav>
+</div>
+
+<div class="toast" id="toast">✦ Saved</div>
+
+<script>
+// ── CATEGORIES — exactly balanced to $10,288 ──
+const CATS = [
+  {id:'rent',      label:'Rent',       emoji:'🏠', def:2400},
+  {id:'loans',     label:'Loans',      emoji:'🎓', def:500},
+  {id:'groceries', label:'Groceries',  emoji:'🛒', def:550},
+  {id:'dining',    label:'Dining Out', emoji:'🍽️', def:200},
+  {id:'gas',       label:'Gas',        emoji:'⛽', def:200},
+  {id:'bills',     label:'Bills',      emoji:'💡', def:250},
+  {id:'health',    label:'Health',     emoji:'💊', def:150},
+  {id:'fun',       label:'Fun',        emoji:'🎉', def:150},
+  {id:'other',     label:'Other',      emoji:'📦', def:300},
+  {id:'house',     label:'House Fund', emoji:'💰', def:4500},
+  // buffer $88 — intentionally unbudgeted float
+];
+
+const DEFAULTS = {
+  expenses: [],
+  budgets: Object.fromEntries(CATS.map(c=>[c.id, c.def])),
+  names: {b:'Benjamin', a:'Adrian'},
+  houseGoal: 55000,
+  houseSaved: 0,
+  vm: new Date().getMonth(),
+  vy: new Date().getFullYear(),
+  lastUpdated: 0
+};
+
+let S = JSON.parse(JSON.stringify(DEFAULTS));
+let sWho = 'b', sCat = '', fCat = 'all';
+let pollTimer = null;
+
+// ── STORAGE HELPERS ──
+const STORAGE_KEY = 'ba-family-budget-v3';
+
+async function cloudLoad() {
+  setSyncStatus('syncing', 'Syncing…');
+  try {
+    const result = await window.storage.get(STORAGE_KEY, true);
+    if (result && result.value) {
+      const remote = JSON.parse(result.value);
+      S = mergeState(remote);
+    }
+    setSyncStatus('ok', 'Synced · ' + timeStr());
+  } catch(e) {
+    // storage unavailable — try localStorage fallback
+    try {
+      const local = localStorage.getItem(STORAGE_KEY);
+      if (local) S = mergeState(JSON.parse(local));
+    } catch(e2) {}
+    setSyncStatus('ok', 'Ready (offline)');
+  }
+}
+
+async function cloudSave() {
+  S.lastUpdated = Date.now();
+  setSyncStatus('syncing', 'Saving…');
+  // always write local backup immediately
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch(e) {}
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify(S), true);
+    setSyncStatus('ok', 'Synced · ' + timeStr());
+  } catch(e) {
+    setSyncStatus('ok', 'Saved locally');
+  }
+}
+
+async function cloudPoll() {
+  try {
+    const result = await window.storage.get(STORAGE_KEY, true);
+    if (!result || !result.value) return;
+    const remote = JSON.parse(result.value);
+    if ((remote.lastUpdated || 0) > (S.lastUpdated || 0)) {
+      S = mergeState(remote);
+      renderDash();
+      setSyncStatus('ok', 'Updated · ' + timeStr());
+    }
+  } catch(e) {}
+}
+
+function mergeState(remote) {
+  const merged = {...DEFAULTS, ...remote};
+  CATS.forEach(c => { if (merged.budgets[c.id] === undefined) merged.budgets[c.id] = c.def; });
+  return merged;
+}
+
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  if (!dot || !lbl) return;
+  dot.className = 'sync-dot' + (state === 'syncing' ? ' syncing' : state === 'error' ? ' error' : '');
+  lbl.textContent = label;
+}
+
+function timeStr() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── PAGES ──
+function showPage(n, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + n).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (n === 'dashboard') renderDash();
+  if (n === 'add')       setupForm();
+  if (n === 'history')   renderHistory();
+  if (n === 'settings')  loadSettings();
+}
+
+function changeMonth(d) {
+  S.vm += d;
+  if (S.vm > 11) { S.vm = 0; S.vy++; }
+  if (S.vm < 0)  { S.vm = 11; S.vy--; }
+  renderDash();
+}
+
+function monthExps() {
+  return S.expenses.filter(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    return d.getMonth() === S.vm && d.getFullYear() === S.vy;
+  });
+}
+
+function fmt(n)  { return '$' + Math.round(Number(n)).toLocaleString(); }
+function fmtD(n) { return '$' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+// ── HOUSE CARD ──
+function renderHouseCard() {
+  const goal = parseFloat(S.houseGoal) || 55000;
+  const base = parseFloat(S.houseSaved) || 0;
+  const fromExps = S.expenses.filter(e => e.category === 'house').reduce((s,e) => s + parseFloat(e.amount), 0);
+  const total = base + fromExps;
+  const pct = goal > 0 ? Math.min(100, (total / goal) * 100) : 0;
+  const remaining = Math.max(0, goal - total);
+  const monthsLeft = remaining > 0 ? Math.ceil(remaining / 4500) : 0;
+  const milestones = [{v:10,l:'10%'},{v:20,l:'20%'},{v:50,l:'50%'}];
+
+  document.getElementById('house-card-wrap').innerHTML = `
+    <div class="house-card">
+      <div class="h-eyebrow">House Fund · Goal ${fmt(goal)}</div>
+      <div class="h-amount">${fmt(total)}</div>
+      <div class="h-sub">${fmt(remaining)} remaining · ~${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} to go</div>
+      <div class="h-bar-wrap">
+        <div class="h-bar-labels"><span>${pct.toFixed(1)}% of goal</span><span>${fmt(goal)}</span></div>
+        <div class="h-bar"><div class="h-bar-fill" id="hfill" style="width:0%"></div></div>
+      </div>
+      <div class="h-milestones">
+        ${milestones.map(m => `<div class="ms ${pct >= m.v ? 'reached' : ''}">
+          <div class="ms-pct">${m.v}%</div>
+          <div class="ms-lbl">${pct >= m.v ? '✓ ' : ''}${m.l}</div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const f = document.getElementById('hfill');
+    if (f) f.style.width = pct + '%';
+  }));
+}
+
+// ── DASHBOARD ──
+function renderDash() {
+  const now = new Date();
+  const h = now.getHours();
+  document.getElementById('dash-greet').textContent = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const isCur = S.vm === now.getMonth() && S.vy === now.getFullYear();
+  document.getElementById('month-lbl').textContent = MONTHS[S.vm] + ' ' + S.vy;
+  document.getElementById('dash-sub').textContent = isCur ? "Here's how you're doing this month" : "Viewing a past month";
+
+  renderHouseCard();
+
+  const exps = monthExps();
+  const total = exps.reduce((s,e) => s + parseFloat(e.amount), 0);
+  const totBudget = Object.values(S.budgets).reduce((s,v) => s + (parseFloat(v)||0), 0);
+  const bTot = exps.filter(e => e.who === 'b').reduce((s,e) => s + parseFloat(e.amount), 0);
+  const aTot = exps.filter(e => e.who === 'a').reduce((s,e) => s + parseFloat(e.amount), 0);
+  const pct = totBudget > 0 ? Math.min(100, Math.round((total / totBudget) * 100)) : 0;
+  const rem = Math.max(0, totBudget - total);
+  const bPct = total > 0 ? Math.round((bTot / total) * 100) : 0;
+  const aPct = total > 0 ? Math.round((aTot / total) * 100) : 0;
+
+  document.getElementById('summary-cards').innerHTML = `
+    <div class="card hero-card">
+      <div class="card-lbl">Monthly Spending</div>
+      <div class="card-val">${fmt(total)}</div>
+      <div class="card-sub">${fmt(rem)} remaining of ${fmt(totBudget)}</div>
+      <div class="hero-bar"><div class="hero-bar-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="card border-b">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="monogram mono-b">${(S.names.b||'B')[0]}</div>
+        <div class="card-lbl" style="margin:0">${S.names.b||'Benjamin'}</div>
+      </div>
+      <div class="card-val" style="font-size:22px">${fmt(bTot)}</div>
+      <div class="card-sub">${bPct}% of total</div>
+    </div>
+    <div class="card border-a">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="monogram mono-a">${(S.names.a||'A')[0]}</div>
+        <div class="card-lbl" style="margin:0">${S.names.a||'Adrian'}</div>
+      </div>
+      <div class="card-val" style="font-size:22px">${fmt(aTot)}</div>
+      <div class="card-sub">${aPct}% of total</div>
+    </div>`;
+
+  const cs = {};
+  exps.forEach(e => { cs[e.category] = (cs[e.category] || 0) + parseFloat(e.amount); });
+  const active = CATS.filter(c => cs[c.id] > 0 || (S.budgets[c.id] > 0 && isCur));
+  const cb = document.getElementById('cat-bars');
+  cb.innerHTML = active.length ? active.map(c => {
+    const sp = cs[c.id] || 0;
+    const bg = parseFloat(S.budgets[c.id]) || 0;
+    const p = bg > 0 ? Math.min(100, Math.round((sp / bg) * 100)) : 0;
+    const cls = p >= 100 ? 'bar-danger' : p >= 75 ? 'bar-warn' : 'bar-good';
+    return `<div class="cat-row">
+      <div class="cat-row-top">
+        <div class="cat-name"><div class="cat-ico">${c.emoji}</div>${c.label}</div>
+        <div class="cat-amts">${fmtD(sp)}${bg > 0 ? ' / ' + fmt(bg) : ''}</div>
+      </div>
+      ${bg > 0 ? `<div class="cat-bar"><div class="cat-bar-fill ${cls}" style="width:${p}%"></div></div>` : ''}
+    </div>`;
+  }).join('') : '<div style="color:var(--muted);font-size:13px;font-weight:300;padding:4px 0">No spending recorded yet.</div>';
+
+  const recent = [...exps].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
+  document.getElementById('recent-txns').innerHTML = recent.length ? recent.map(txnHTML).join('')
+    : `<div class="empty-state"><div class="big">✦</div><p>No expenses this month.<br><em>Tap + to add one.</em></p></div>`;
+}
+
+// ── TRANSACTION HTML ──
+function txnHTML(e) {
+  const cat = CATS.find(c => c.id === e.category);
+  const wName = e.who === 'b' ? (S.names.b || 'Benjamin') : (S.names.a || 'Adrian');
+  const wClass = e.who === 'b' ? 'who-b' : 'who-a';
+  const ds = new Date(e.date + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  return `<div class="txn" onclick="delExp('${e.id}')">
+    <div class="txn-ico">${cat ? cat.emoji : '📦'}</div>
+    <div class="txn-info">
+      <div class="txn-title">${e.merchant || 'Expense'}</div>
+      <div class="txn-meta">${ds} · ${cat ? cat.label : 'Other'}<span class="who-pill ${wClass}">${wName}</span></div>
+    </div>
+    <div class="txn-amount">${fmtD(e.amount)}</div>
+  </div>`;
+}
+
+function delExp(id) {
+  if (!confirm('Delete this expense?')) return;
+  S.expenses = S.expenses.filter(e => e.id !== id);
+  cloudSave(); renderDash(); renderHistory();
+}
+
+// ── FORM ──
+function setupForm() {
+  document.getElementById('cat-grid').innerHTML = CATS.map(c =>
+    `<button class="cat-btn" id="cb-${c.id}" onclick="selectCat('${c.id}')"><span>${c.emoji}</span>${c.label}</button>`
+  ).join('');
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  sCat = ''; selectWho('b');
+}
+
+function selectWho(w) {
+  sWho = w;
+  document.getElementById('who-b').className = w === 'b' ? 'act-b' : '';
+  document.getElementById('who-a').className = w === 'a' ? 'act-a' : '';
+}
+function selectCat(id) {
+  sCat = id;
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('cb-' + id)?.classList.add('selected');
+}
+
+function submitExpense() {
+  const amount = parseFloat(document.getElementById('f-amount').value);
+  const merchant = document.getElementById('f-merchant').value.trim();
+  const date = document.getElementById('f-date').value;
+  const notes = document.getElementById('f-notes').value.trim();
+  if (!amount || amount <= 0) { alert('Please enter an amount.'); return; }
+  if (!merchant) { alert('Please enter where you spent.'); return; }
+  if (!sCat) { alert('Please select a category.'); return; }
+  S.expenses.unshift({
+    id: Date.now().toString(),
+    amount: amount.toFixed(2),
+    merchant, date, notes,
+    category: sCat, who: sWho
+  });
+  cloudSave();
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-merchant').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+  sCat = '';
+  showToast('✦ Expense saved');
+  setTimeout(() => {
+    S.vm = new Date().getMonth(); S.vy = new Date().getFullYear();
+    showPage('dashboard', document.querySelector('nav button'));
+  }, 650);
+}
+
+// ── HISTORY ──
+function renderHistory() {
+  const chips = [
+    {id:'all', label:'All'},
+    {id:'b', label: S.names.b || 'Benjamin', emoji:'👤'},
+    {id:'a', label: S.names.a || 'Adrian', emoji:'👤'},
+    ...CATS
+  ];
+  document.getElementById('filter-row').innerHTML = chips.map(c =>
+    `<div class="filter-chip ${fCat === c.id ? 'active' : ''}" onclick="setFilter('${c.id}')">${c.emoji ? c.emoji + ' ' : ''}${c.label}</div>`
+  ).join('');
+  let filtered = [...S.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (fCat === 'b' || fCat === 'a') filtered = filtered.filter(e => e.who === fCat);
+  else if (fCat !== 'all') filtered = filtered.filter(e => e.category === fCat);
+  document.getElementById('all-txns').innerHTML = filtered.length ? filtered.map(txnHTML).join('')
+    : `<div class="empty-state"><div class="big">✦</div><p>No transactions found.</p></div>`;
+}
+function setFilter(id) { fCat = id; renderHistory(); }
+
+// ── SETTINGS ──
+function loadSettings() {
+  document.getElementById('s-name-b').value = S.names.b || '';
+  document.getElementById('s-name-a').value = S.names.a || '';
+  document.getElementById('s-house-goal').value = S.houseGoal || 55000;
+  document.getElementById('s-house-saved').value = S.houseSaved || 0;
+  document.getElementById('budget-settings').innerHTML = CATS.map(c =>
+    `<div class="settings-row">
+      <div class="s-ico">${c.emoji}</div>
+      <label>${c.label}</label>
+      <input type="number" id="bg-${c.id}" value="${S.budgets[c.id] || 0}" min="0" step="10">
+    </div>`
+  ).join('');
+}
+
+function saveSettings() {
+  S.names.b = document.getElementById('s-name-b').value.trim() || 'Benjamin';
+  S.names.a = document.getElementById('s-name-a').value.trim() || 'Adrian';
+  S.houseGoal = parseFloat(document.getElementById('s-house-goal').value) || 55000;
+  S.houseSaved = parseFloat(document.getElementById('s-house-saved').value) || 0;
+  CATS.forEach(c => { S.budgets[c.id] = parseFloat(document.getElementById('bg-' + c.id).value) || 0; });
+  cloudSave();
+  showToast('✦ Settings synced');
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── INIT ──
+async function init() {
+  await cloudLoad();
+  document.getElementById('loading').classList.add('hidden');
+  renderDash();
+  setupForm();
+  // poll every 20s so Adrian's entries appear on Benjamin's phone and vice versa
+  pollTimer = setInterval(cloudPoll, 20000);
+  // also sync on tab/app focus
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') cloudPoll();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
