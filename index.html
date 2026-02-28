@@ -19,12 +19,10 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;background:var(--cream);color:var(--text);font-family:'Lato',sans-serif;}
-
 .app{display:flex;flex-direction:column;height:100vh;max-width:430px;margin:0 auto;background:var(--cream);position:relative;overflow:hidden;}
 .app::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.028;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size:180px;}
-
 .page{flex:1;overflow-y:auto;padding-bottom:90px;display:none;-webkit-overflow-scrolling:touch;}
 .page.active{display:block;animation:fadeUp 0.26s ease both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
@@ -153,7 +151,7 @@ nav button svg{width:20px;height:20px;}
 .submit-btn{width:100%;padding:17px;background:var(--forest);color:var(--cream);border:none;border-radius:var(--radius);font-family:'Lato',sans-serif;font-size:15px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 20px rgba(30,53,40,0.22);transition:opacity 0.15s,transform 0.1s;margin-top:4px;}
 .submit-btn:active{opacity:0.88;transform:scale(0.99);}
 
-/* HISTORY FILTERS */
+/* HISTORY */
 .filter-row{display:flex;gap:8px;padding:0 22px 16px;overflow-x:auto;scrollbar-width:none;}
 .filter-row::-webkit-scrollbar{display:none;}
 .filter-chip{padding:7px 15px;background:#fff;border:1.5px solid var(--cream3);border-radius:999px;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.18s;box-shadow:0 2px 8px rgba(30,53,40,0.05);}
@@ -200,7 +198,6 @@ nav button svg{width:20px;height:20px;}
 </div>
 
 <div class="app">
-
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
     <div class="page-header">
@@ -304,7 +301,7 @@ nav button svg{width:20px;height:20px;}
         <span>Already saved</span>
         <input type="number" id="s-house-saved" value="0" min="0" step="100">
       </div>
-      <div class="settings-hint">Logging a "💰 House Fund" expense each month automatically adds to your progress tracker above.</div>
+      <div class="settings-hint">Logging a "💰 House Fund" expense each month automatically adds to your progress tracker.</div>
     </div>
     <div class="sec-title"><span>Monthly Budget Limits</span></div>
     <div class="settings-section" id="budget-settings"></div>
@@ -336,8 +333,27 @@ nav button svg{width:20px;height:20px;}
 
 <div class="toast" id="toast">✦ Saved</div>
 
-<script>
-// ── CATEGORIES — exactly balanced to $10,288 ──
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── FIREBASE CONFIG ──
+const firebaseConfig = {
+  apiKey: "AIzaSyCLaGPfH2FbNO9Ed_IZBL4QzxBTlw_roRs",
+  authDomain: "o-connor-budget.firebaseapp.com",
+  databaseURL: "https://o-connor-budget-default-rtdb.firebaseio.com",
+  projectId: "o-connor-budget",
+  storageBucket: "o-connor-budget.firebasestorage.app",
+  messagingSenderId: "378761527842",
+  appId: "1:378761527842:web:46ec7bec236084460c807b"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getDatabase(firebaseApp);
+const DATA_REF = ref(db, 'budget');
+
+// ── CATEGORIES ──
 const CATS = [
   {id:'rent',      label:'Rent',       emoji:'🏠', def:2400},
   {id:'loans',     label:'Loans',      emoji:'🎓', def:500},
@@ -349,78 +365,23 @@ const CATS = [
   {id:'fun',       label:'Fun',        emoji:'🎉', def:150},
   {id:'other',     label:'Other',      emoji:'📦', def:300},
   {id:'house',     label:'House Fund', emoji:'💰', def:4500},
-  // buffer $88 — intentionally unbudgeted float
 ];
 
 const DEFAULTS = {
   expenses: [],
-  budgets: Object.fromEntries(CATS.map(c=>[c.id, c.def])),
+  budgets: Object.fromEntries(CATS.map(c => [c.id, c.def])),
   names: {b:'Benjamin', a:'Adrian'},
   houseGoal: 55000,
   houseSaved: 0,
   vm: new Date().getMonth(),
-  vy: new Date().getFullYear(),
-  lastUpdated: 0
+  vy: new Date().getFullYear()
 };
 
 let S = JSON.parse(JSON.stringify(DEFAULTS));
 let sWho = 'b', sCat = '', fCat = 'all';
-let pollTimer = null;
+let isInitialLoad = true;
 
-// ── STORAGE HELPERS ──
-const STORAGE_KEY = 'ba-family-budget-v3';
-
-async function cloudLoad() {
-  setSyncStatus('syncing', 'Syncing…');
-  try {
-    const result = await window.storage.get(STORAGE_KEY, true);
-    if (result && result.value) {
-      const remote = JSON.parse(result.value);
-      S = mergeState(remote);
-    }
-    setSyncStatus('ok', 'Synced · ' + timeStr());
-  } catch(e) {
-    // storage unavailable — try localStorage fallback
-    try {
-      const local = localStorage.getItem(STORAGE_KEY);
-      if (local) S = mergeState(JSON.parse(local));
-    } catch(e2) {}
-    setSyncStatus('ok', 'Ready (offline)');
-  }
-}
-
-async function cloudSave() {
-  S.lastUpdated = Date.now();
-  setSyncStatus('syncing', 'Saving…');
-  // always write local backup immediately
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(S)); } catch(e) {}
-  try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(S), true);
-    setSyncStatus('ok', 'Synced · ' + timeStr());
-  } catch(e) {
-    setSyncStatus('ok', 'Saved locally');
-  }
-}
-
-async function cloudPoll() {
-  try {
-    const result = await window.storage.get(STORAGE_KEY, true);
-    if (!result || !result.value) return;
-    const remote = JSON.parse(result.value);
-    if ((remote.lastUpdated || 0) > (S.lastUpdated || 0)) {
-      S = mergeState(remote);
-      renderDash();
-      setSyncStatus('ok', 'Updated · ' + timeStr());
-    }
-  } catch(e) {}
-}
-
-function mergeState(remote) {
-  const merged = {...DEFAULTS, ...remote};
-  CATS.forEach(c => { if (merged.budgets[c.id] === undefined) merged.budgets[c.id] = c.def; });
-  return merged;
-}
-
+// ── SYNC STATUS ──
 function setSyncStatus(state, label) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
@@ -431,6 +392,46 @@ function setSyncStatus(state, label) {
 
 function timeStr() {
   return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// ── FIREBASE SAVE ──
+async function cloudSave() {
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    await set(DATA_REF, S);
+    setSyncStatus('ok', 'Synced · ' + timeStr());
+  } catch(e) {
+    setSyncStatus('error', 'Sync failed — check connection');
+    console.error('Firebase save error:', e);
+  }
+}
+
+// ── FIREBASE REAL-TIME LISTENER ──
+// This fires instantly on any device whenever data changes
+function startRealtimeSync() {
+  setSyncStatus('syncing', 'Connecting…');
+  onValue(DATA_REF, (snapshot) => {
+    const remote = snapshot.val();
+    if (remote) {
+      // preserve current view month/year while updating data
+      const vm = S.vm, vy = S.vy;
+      S = {...DEFAULTS, ...remote};
+      CATS.forEach(c => { if (S.budgets[c.id] === undefined) S.budgets[c.id] = c.def; });
+      if (!isInitialLoad) {
+        S.vm = vm; S.vy = vy;
+      }
+    }
+    isInitialLoad = false;
+    setSyncStatus('ok', 'Synced · ' + timeStr());
+    document.getElementById('loading').classList.add('hidden');
+    renderDash();
+    // refresh history if visible
+    if (document.getElementById('page-history').classList.contains('active')) renderHistory();
+  }, (error) => {
+    setSyncStatus('error', 'Connection error');
+    console.error('Firebase listener error:', error);
+    document.getElementById('loading').classList.add('hidden');
+  });
 }
 
 // ── PAGES ──
@@ -444,6 +445,7 @@ function showPage(n, btn) {
   if (n === 'history')   renderHistory();
   if (n === 'settings')  loadSettings();
 }
+window.showPage = showPage;
 
 function changeMonth(d) {
   S.vm += d;
@@ -451,9 +453,11 @@ function changeMonth(d) {
   if (S.vm < 0)  { S.vm = 11; S.vy--; }
   renderDash();
 }
+window.changeMonth = changeMonth;
 
 function monthExps() {
-  return S.expenses.filter(e => {
+  const exps = Array.isArray(S.expenses) ? S.expenses : Object.values(S.expenses || {});
+  return exps.filter(e => {
     const d = new Date(e.date + 'T00:00:00');
     return d.getMonth() === S.vm && d.getFullYear() === S.vy;
   });
@@ -466,7 +470,8 @@ function fmtD(n) { return '$' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d
 function renderHouseCard() {
   const goal = parseFloat(S.houseGoal) || 55000;
   const base = parseFloat(S.houseSaved) || 0;
-  const fromExps = S.expenses.filter(e => e.category === 'house').reduce((s,e) => s + parseFloat(e.amount), 0);
+  const allExps = Array.isArray(S.expenses) ? S.expenses : Object.values(S.expenses || {});
+  const fromExps = allExps.filter(e => e.category === 'house').reduce((s,e) => s + parseFloat(e.amount), 0);
   const total = base + fromExps;
   const pct = goal > 0 ? Math.min(100, (total / goal) * 100) : 0;
   const remaining = Math.max(0, goal - total);
@@ -559,6 +564,7 @@ function renderDash() {
     </div>`;
   }).join('') : '<div style="color:var(--muted);font-size:13px;font-weight:300;padding:4px 0">No spending recorded yet.</div>';
 
+  const allExps = Array.isArray(S.expenses) ? S.expenses : Object.values(S.expenses || {});
   const recent = [...exps].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 8);
   document.getElementById('recent-txns').innerHTML = recent.length ? recent.map(txnHTML).join('')
     : `<div class="empty-state"><div class="big">✦</div><p>No expenses this month.<br><em>Tap + to add one.</em></p></div>`;
@@ -582,9 +588,15 @@ function txnHTML(e) {
 
 function delExp(id) {
   if (!confirm('Delete this expense?')) return;
-  S.expenses = S.expenses.filter(e => e.id !== id);
-  cloudSave(); renderDash(); renderHistory();
+  if (Array.isArray(S.expenses)) {
+    S.expenses = S.expenses.filter(e => e.id !== id);
+  } else {
+    const arr = Object.values(S.expenses || {}).filter(e => e.id !== id);
+    S.expenses = arr;
+  }
+  cloudSave();
 }
+window.delExp = delExp;
 
 // ── FORM ──
 function setupForm() {
@@ -600,11 +612,14 @@ function selectWho(w) {
   document.getElementById('who-b').className = w === 'b' ? 'act-b' : '';
   document.getElementById('who-a').className = w === 'a' ? 'act-a' : '';
 }
+window.selectWho = selectWho;
+
 function selectCat(id) {
   sCat = id;
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('cb-' + id)?.classList.add('selected');
 }
+window.selectCat = selectCat;
 
 function submitExpense() {
   const amount = parseFloat(document.getElementById('f-amount').value);
@@ -614,13 +629,12 @@ function submitExpense() {
   if (!amount || amount <= 0) { alert('Please enter an amount.'); return; }
   if (!merchant) { alert('Please enter where you spent.'); return; }
   if (!sCat) { alert('Please select a category.'); return; }
-  S.expenses.unshift({
-    id: Date.now().toString(),
-    amount: amount.toFixed(2),
-    merchant, date, notes,
-    category: sCat, who: sWho
-  });
+
+  const newExp = { id: Date.now().toString(), amount: amount.toFixed(2), merchant, date, notes, category: sCat, who: sWho };
+  if (!Array.isArray(S.expenses)) S.expenses = Object.values(S.expenses || {});
+  S.expenses.unshift(newExp);
   cloudSave();
+
   document.getElementById('f-amount').value = '';
   document.getElementById('f-merchant').value = '';
   document.getElementById('f-notes').value = '';
@@ -633,6 +647,7 @@ function submitExpense() {
     showPage('dashboard', document.querySelector('nav button'));
   }, 650);
 }
+window.submitExpense = submitExpense;
 
 // ── HISTORY ──
 function renderHistory() {
@@ -645,13 +660,16 @@ function renderHistory() {
   document.getElementById('filter-row').innerHTML = chips.map(c =>
     `<div class="filter-chip ${fCat === c.id ? 'active' : ''}" onclick="setFilter('${c.id}')">${c.emoji ? c.emoji + ' ' : ''}${c.label}</div>`
   ).join('');
-  let filtered = [...S.expenses].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const allExps = Array.isArray(S.expenses) ? S.expenses : Object.values(S.expenses || {});
+  let filtered = [...allExps].sort((a,b) => new Date(b.date) - new Date(a.date));
   if (fCat === 'b' || fCat === 'a') filtered = filtered.filter(e => e.who === fCat);
   else if (fCat !== 'all') filtered = filtered.filter(e => e.category === fCat);
   document.getElementById('all-txns').innerHTML = filtered.length ? filtered.map(txnHTML).join('')
     : `<div class="empty-state"><div class="big">✦</div><p>No transactions found.</p></div>`;
 }
+
 function setFilter(id) { fCat = id; renderHistory(); }
+window.setFilter = setFilter;
 
 // ── SETTINGS ──
 function loadSettings() {
@@ -677,6 +695,7 @@ function saveSettings() {
   cloudSave();
   showToast('✦ Settings synced');
 }
+window.saveSettings = saveSettings;
 
 // ── TOAST ──
 function showToast(msg) {
@@ -686,20 +705,8 @@ function showToast(msg) {
 }
 
 // ── INIT ──
-async function init() {
-  await cloudLoad();
-  document.getElementById('loading').classList.add('hidden');
-  renderDash();
-  setupForm();
-  // poll every 20s so Adrian's entries appear on Benjamin's phone and vice versa
-  pollTimer = setInterval(cloudPoll, 20000);
-  // also sync on tab/app focus
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') cloudPoll();
-  });
-}
+startRealtimeSync();
 
-init();
 </script>
 </body>
 </html>
